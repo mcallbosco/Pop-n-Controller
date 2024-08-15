@@ -13,3 +13,8 @@ NutBolt.stl x8
 
 
 
+
+## Side Notes
+I have made a diffrent version of PopnMusicTop.dfx that features the mesurements from (https://github.com/CrazyRedMachine/PopnPanel). Besides being more arcade accurate, that also makes this compatible with his graphics. 
+
+
