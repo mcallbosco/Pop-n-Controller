@@ -27,7 +27,7 @@ module UniversalConnector(length=20, width=8, height=4, wall_thickness=1.5, ridg
     eff_l = length - tolerance; 
     
     // Extrude along Y
-    rotate([90, 0, 0])
+    rotate([-90, 0, 0])
     linear_extrude(height=eff_l, center=true)
         connector_profile(eff_w, eff_h, wall_thickness, ridge_depth);
 }
@@ -40,7 +40,7 @@ module UniversalConnectorCutout(length=20, width=8, height=4, wall_thickness=1.5
     eff_l = length + tolerance;
     
     // Extrude along Y
-    rotate([90, 0, 0])
+    rotate([-90, 0, 0])
     linear_extrude(height=eff_l, center=true)
         connector_profile(eff_w, eff_h, wall_thickness, ridge_depth);
 }

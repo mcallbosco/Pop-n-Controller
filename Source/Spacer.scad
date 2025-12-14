@@ -13,7 +13,7 @@ use <Connector.scad>
 // Top Row:    5=Left, 6=Mid-Left, 7=Mid-Right, 8=Right
 // Part 9 is the printable dowel pin.
 // Part 10 is the printable connector.
-part_to_render = 10; // [1:10]
+part_to_render = 2; // [1:10]
 
 // --- Split line coordinates ---
 // creating a 4x2 grid of parts.
@@ -37,7 +37,7 @@ printer_tolerance = 0.2; // Clearance for the dowel. Adjust for a looser/tighter
 conn_len = 30;
 conn_width = 10;
 conn_height = 5;
-conn_z_pos = 4; // Centered in the 8mm bottom plate
+conn_z_pos = 8; // Flush with the top of the 8mm bottom plate
 
 //=====================================================================
 //== Original Model Definition
