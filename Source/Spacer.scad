@@ -2,6 +2,7 @@
 include <cyl_head_bolt.scad>;
 include <materials.scad>;
 use <threads-library-by-cuiso-v1.scad>
+use <Connector.scad>
 
 //=====================================================================
 //== Configuration for Splitting and Printing
@@ -11,7 +12,8 @@ use <threads-library-by-cuiso-v1.scad>
 // Bottom Row: 1=Left, 2=Mid-Left, 3=Mid-Right, 4=Right
 // Top Row:    5=Left, 6=Mid-Left, 7=Mid-Right, 8=Right
 // Part 9 is the printable dowel pin.
-part_to_render = 2; // [1:9]
+// Part 10 is the printable connector.
+part_to_render = 10; // [1:10]
 
 // --- Split line coordinates ---
 // creating a 4x2 grid of parts.
@@ -30,6 +32,12 @@ y_cut1 = 138.2555; // This is the vertical centerline of the model
 dowel_d = 5;          // Diameter of the dowel pins (in mm)
 dowel_hole_depth = 10;  // Depth of the hole on each side
 printer_tolerance = 0.2; // Clearance for the dowel. Adjust for a looser/tighter fit.
+
+// --- Connector Parameters ---
+conn_len = 20;
+conn_width = 8;
+conn_height = 4;
+conn_z_pos = 4; // Centered in the 8mm bottom plate
 
 //=====================================================================
 //== Original Model Definition
@@ -121,6 +129,36 @@ module printable_dowel() {
     rotate([90,0,0]) cylinder(h = dowel_hole_depth * 2 - printer_tolerance, d = dowel_d, center = true, $fn=32);
 }
 
+// -- Connector Modules
+module connectors_bottom() {
+    for (cut_x = [x_cut_bottom_1, x_cut_bottom_2, x_cut_bottom_3]) {
+        // Place connectors in the flat part (Z=4)
+        // Avoid button holes.
+        for (y_pos = [30, 110]) {
+            translate([cut_x, y_pos, conn_z_pos]) 
+                UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
+        }
+    }
+}
+
+module connectors_top() {
+    for (cut_x = [x_cut_top_1, x_cut_top_2, x_cut_top_3]) {
+        for (y_pos = [160, 240]) {
+            translate([cut_x, y_pos, conn_z_pos]) 
+                UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
+        }
+    }
+}
+
+module connectors_at_y1() {
+    // Along the horizontal seam
+    for (x_pos = [50, 200, 314, 450, 500, 650]) {
+        translate([x_pos, y_cut1, conn_z_pos]) 
+            rotate([0, 0, 90]) // Rotate to span across Y-cut
+            UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
+    }
+}
+
 //=====================================================================
 //== Part Selection and Rendering
 //=====================================================================
@@ -146,17 +184,23 @@ if (part_to_render >= 1 && part_to_render <= 8) {
         // Holes are added to all parts at the seams
         if (part_to_render >= 1 && part_to_render <= 4) {
             dowels_bottom();
+            connectors_bottom();
         }
         if (part_to_render >= 5 && part_to_render <= 8) {
             dowels_top();
+            connectors_top();
         }
         if (part_to_render >= 1 && part_to_render <= 8) {
             dowels_at_y1();
+            connectors_at_y1();
         }
     }
 } else if (part_to_render == 9) {
     printable_dowel();
+} else if (part_to_render == 10) {
+    echo("Rendering one connector.");
+    UniversalConnector(length=conn_len, width=conn_width, height=conn_height);
 } else {
-    echo("Invalid part_to_render selected! Please choose a value from 1 to 9.");
+    echo("Invalid part_to_render selected! Please choose a value from 1 to 10.");
     %original_model(); // Show the full model with cut lines for reference
 }
