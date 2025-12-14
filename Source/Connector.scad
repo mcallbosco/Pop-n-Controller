@@ -3,22 +3,23 @@
 // Shape: U-channel (Box without top and two faces) with side ridges.
 
 // Generates the 2D profile of the connector (U-shape with side ridges)
-module connector_profile(width, height, wall_thickness, ridge_depth) {
+module connector_profile(width, height, wall_thickness, base_thickness, ridge_depth) {
     w = width;
     h = height;
     wt = wall_thickness;
+    bt = base_thickness;
     rd = ridge_depth;
     
     // Centered on X, Bottom at Y=0 (in 2D) -> Z=0 in 3D
     // U-shape body
     difference() {
         translate([-w/2, 0]) square([w, h]);
-        translate([-w/2 + wt, wt]) square([w - 2*wt, h + 0.1]); // +0.1 to ensure top cut
+        translate([-w/2 + wt, bt]) square([w - 2*wt, h + 0.1]); // +0.1 to ensure top cut
     }
 }
 
 // Generates the 3D connector object
-module UniversalConnector(length=20, width=8, height=4, wall_thickness=1.5, ridge_depth=0.5, tolerance=0) {
+module UniversalConnector(length=20, width=8, height=4, wall_thickness=2.5, base_thickness=3.0, ridge_depth=0.5, tolerance=0) {
     // Apply tolerance to shrink the connector slightly if needed
     // Usually tolerance is 0 for the part, and >0 for the hole.
     
@@ -29,11 +30,11 @@ module UniversalConnector(length=20, width=8, height=4, wall_thickness=1.5, ridg
     // Extrude along Y
     rotate([-90, 0, 0])
     linear_extrude(height=eff_l, center=true)
-        connector_profile(eff_w, eff_h, wall_thickness, ridge_depth);
+        connector_profile(eff_w, eff_h, wall_thickness, base_thickness, ridge_depth);
 }
 
 // Generates the negative volume to subtract from the parts
-module UniversalConnectorCutout(length=20, width=8, height=4, wall_thickness=1.5, ridge_depth=0.5, tolerance=0.2) {
+module UniversalConnectorCutout(length=20, width=8, height=4, wall_thickness=2.5, base_thickness=3.0, ridge_depth=0.5, tolerance=0.2) {
     // Cutout is larger by tolerance
     eff_w = width + tolerance;
     eff_h = height; // Height usually matches surface, or +tolerance if embedded
@@ -42,5 +43,5 @@ module UniversalConnectorCutout(length=20, width=8, height=4, wall_thickness=1.5
     // Extrude along Y
     rotate([-90, 0, 0])
     linear_extrude(height=eff_l, center=true)
-        connector_profile(eff_w, eff_h, wall_thickness, ridge_depth);
+        connector_profile(eff_w, eff_h, wall_thickness, base_thickness, ridge_depth);
 }
