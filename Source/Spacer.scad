@@ -34,9 +34,9 @@ dowel_hole_depth = 10;  // Depth of the hole on each side
 printer_tolerance = 0.2; // Clearance for the dowel. Adjust for a looser/tighter fit.
 
 // --- Connector Parameters ---
-conn_len = 20;
-conn_width = 8;
-conn_height = 4;
+conn_len = 30;
+conn_width = 10;
+conn_height = 5;
 conn_z_pos = 4; // Centered in the 8mm bottom plate
 
 //=====================================================================
@@ -154,7 +154,7 @@ module connectors_at_y1() {
     // Along the horizontal seam
     for (x_pos = [50, 200, 314, 450, 500, 650]) {
         translate([x_pos, y_cut1, conn_z_pos]) 
-            rotate([0, 0, 90]) // Rotate to span across Y-cut
+            rotate([0, 0, 90])
             UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
     }
 }

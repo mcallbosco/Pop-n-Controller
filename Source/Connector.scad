@@ -10,28 +10,10 @@ module connector_profile(width, height, wall_thickness, ridge_depth) {
     rd = ridge_depth;
     
     // Centered on X, Bottom at Y=0 (in 2D) -> Z=0 in 3D
-    union() {
-        // U-shape body
-        difference() {
-            translate([-w/2, 0]) square([w, h]);
-            translate([-w/2 + wt, wt]) square([w - 2*wt, h + 0.1]); // +0.1 to ensure top cut
-        }
-        
-        // Ridges on the outer sides
-        // Triangular ridges for locking/friction
-        // Left ridge
-        polygon([
-            [-w/2, h/4],
-            [-w/2 - rd, h/2],
-            [-w/2, 3*h/4]
-        ]);
-        
-        // Right ridge
-        polygon([
-            [w/2, h/4],
-            [w/2 + rd, h/2],
-            [w/2, 3*h/4]
-        ]);
+    // U-shape body
+    difference() {
+        translate([-w/2, 0]) square([w, h]);
+        translate([-w/2 + wt, wt]) square([w - 2*wt, h + 0.1]); // +0.1 to ensure top cut
     }
 }
 
