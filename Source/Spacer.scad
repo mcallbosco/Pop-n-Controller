@@ -11,14 +11,19 @@ use <threads-library-by-cuiso-v1.scad>
 // Bottom Row: 1=Left, 2=Mid-Left, 3=Mid-Right, 4=Right
 // Top Row:    5=Left, 6=Mid-Left, 7=Mid-Right, 8=Right
 // Part 9 is the printable dowel pin.
-part_to_render = 1; // [1:9]
+part_to_render = 2; // [1:9]
 
 // --- Split line coordinates ---
-// CORRECTED: Cuts are now made at the exact center of existing holes
-// to ensure clean splits, creating a 4x2 grid of parts.
-x_cut1 = 139.239;  // Center of hole pattern
-x_cut2 = 349.233;  // Center of hole pattern
-x_cut3 = 559.228;  // Center of hole pattern
+// creating a 4x2 grid of parts.
+// Separate cuts for top and bottom rows to avoid holes
+x_cut_bottom_1 = 139.239;
+x_cut_bottom_2 = 279.235;
+x_cut_bottom_3 = 559.228;
+
+x_cut_top_1 = 209.237;
+x_cut_top_2 = 349.233;
+x_cut_top_3 = 489.230;
+
 y_cut1 = 138.2555; // This is the vertical centerline of the model
 
 // --- Assembly Dowel Parameters ---
@@ -34,7 +39,7 @@ module original_model() {
     // Original variables
     wallthicknessabstract = 21;
     wallHeight = 70; //in mm
-    bottomheight = 5.5; //in mm
+    bottomheight = 8; //in mm
 
     module hole_pattern(holex, holey) {
         translate([holex, holey, 0]) cylinder(h = 88, d = 88, center = true);
@@ -77,11 +82,23 @@ dowel_hole_d = dowel_d + printer_tolerance;
 
 // -- Dowel modules for vertical seams (X-cuts)
 // Dowels are now placed *around* the large holes.
-module dowels_at_x_cuts() {
-    for (cut_x = [x_cut1, x_cut2, x_cut3]) {
+module dowels_bottom() {
+    for (cut_x = [x_cut_bottom_1, x_cut_bottom_2, x_cut_bottom_3]) {
         for (z_pos = [20, 50]) { // Two heights for stability
             // Y positions are chosen to be outside the 88mm diameter holes
-            for (y_pos = [30, 130, 150, 250]) {
+            for (y_pos = [30, 130]) {
+                translate([cut_x, y_pos, z_pos]) rotate([0, 90, 0]) 
+                    cylinder(d = dowel_hole_d, h = dowel_hole_depth * 2, center = true, $fn = 16);
+            }
+        }
+    }
+}
+
+module dowels_top() {
+    for (cut_x = [x_cut_top_1, x_cut_top_2, x_cut_top_3]) {
+        for (z_pos = [20, 50]) { // Two heights for stability
+            // Y positions are chosen to be outside the 88mm diameter holes
+            for (y_pos = [150, 250]) {
                 translate([cut_x, y_pos, z_pos]) rotate([0, 90, 0]) 
                     cylinder(d = dowel_hole_d, h = dowel_hole_depth * 2, center = true, $fn = 16);
             }
@@ -91,7 +108,8 @@ module dowels_at_x_cuts() {
 
 // -- Dowel module for the horizontal seam (Y-cut)
 module dowels_at_y1() {
-    for (x_pos = [50, 200, 280, 450, 500, 650]) {
+    // Adjusted 280 to 314 to avoid cut line at 279.235
+    for (x_pos = [50, 200, 314, 450, 500, 650]) {
         translate([x_pos, y_cut1, wallHeight / 2]) rotate([90, 0, 0]) 
             cylinder(d = dowel_hole_d, h = dowel_hole_depth * 2, center = true, $fn = 16);
     }
@@ -114,22 +132,25 @@ if (part_to_render >= 1 && part_to_render <= 8) {
         // First, cut out the main shape of the selected part
         intersection() {
             original_model();
-            if (part_to_render == 1) { translate([0, 0, 0]) cube([x_cut1, y_cut1, total_z]); }
-            if (part_to_render == 2) { translate([x_cut1, 0, 0]) cube([x_cut2 - x_cut1, y_cut1, total_z]); }
-            if (part_to_render == 3) { translate([x_cut2, 0, 0]) cube([x_cut3 - x_cut2, y_cut1, total_z]); }
-            if (part_to_render == 4) { translate([x_cut3, 0, 0]) cube([total_x - x_cut3, y_cut1, total_z]); }
-            if (part_to_render == 5) { translate([0, y_cut1, 0]) cube([x_cut1, total_y - y_cut1, total_z]); }
-            if (part_to_render == 6) { translate([x_cut1, y_cut1, 0]) cube([x_cut2 - x_cut1, total_y - y_cut1, total_z]); }
-            if (part_to_render == 7) { translate([x_cut2, y_cut1, 0]) cube([x_cut3 - x_cut2, total_y - y_cut1, total_z]); }
-            if (part_to_render == 8) { translate([x_cut3, y_cut1, 0]) cube([total_x - x_cut3, total_y - y_cut1, total_z]); }
+            if (part_to_render == 1) { translate([0, 0, 0]) cube([x_cut_bottom_1, y_cut1, total_z]); }
+            if (part_to_render == 2) { translate([x_cut_bottom_1, 0, 0]) cube([x_cut_bottom_2 - x_cut_bottom_1, y_cut1, total_z]); }
+            if (part_to_render == 3) { translate([x_cut_bottom_2, 0, 0]) cube([x_cut_bottom_3 - x_cut_bottom_2, y_cut1, total_z]); }
+            if (part_to_render == 4) { translate([x_cut_bottom_3, 0, 0]) cube([total_x - x_cut_bottom_3, y_cut1, total_z]); }
+            if (part_to_render == 5) { translate([0, y_cut1, 0]) cube([x_cut_top_1, total_y - y_cut1, total_z]); }
+            if (part_to_render == 6) { translate([x_cut_top_1, y_cut1, 0]) cube([x_cut_top_2 - x_cut_top_1, total_y - y_cut1, total_z]); }
+            if (part_to_render == 7) { translate([x_cut_top_2, y_cut1, 0]) cube([x_cut_top_3 - x_cut_top_2, total_y - y_cut1, total_z]); }
+            if (part_to_render == 8) { translate([x_cut_top_3, y_cut1, 0]) cube([total_x - x_cut_top_3, total_y - y_cut1, total_z]); }
         }
 
         // Second, subtract the dowel holes for the appropriate faces
-        // Holes are added to the parts with the "lower" coordinates at each seam
-        if (part_to_render == 1 || part_to_render == 2 || part_to_render == 3 || part_to_render == 5 || part_to_render == 6 || part_to_render == 7) {
-            dowels_at_x_cuts();
+        // Holes are added to all parts at the seams
+        if (part_to_render >= 1 && part_to_render <= 4) {
+            dowels_bottom();
         }
-        if (part_to_render == 1 || part_to_render == 2 || part_to_render == 3 || part_to_render == 4) {
+        if (part_to_render >= 5 && part_to_render <= 8) {
+            dowels_top();
+        }
+        if (part_to_render >= 1 && part_to_render <= 8) {
             dowels_at_y1();
         }
     }
