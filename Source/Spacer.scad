@@ -30,6 +30,32 @@ x_cut_top_3 = 489.230;
 
 y_cut1 = 138.2555; // This is the vertical centerline of the model
 
+// --- Variable Seam Height logic ---
+function get_seam_y(x) = 
+    (x < x_cut_top_1) ? (y_cut1 + 10) :
+    (x < x_cut_top_2) ? y_cut1 :
+    (x < x_cut_top_3) ? (y_cut1 - 5) :
+    y_cut1;
+
+module seam_volume_bottom(x_start, x_end) {
+    intersection() {
+        translate([x_start, 0, 0]) cube([x_end - x_start, total_y, total_z]);
+        union() {
+            translate([-1, 0, -1]) cube([x_cut_top_1 + 1, y_cut1 + 10, total_z + 2]);
+            translate([x_cut_top_1, 0, -1]) cube([x_cut_top_2 - x_cut_top_1, y_cut1, total_z + 2]);
+            translate([x_cut_top_2, 0, -1]) cube([x_cut_top_3 - x_cut_top_2, y_cut1 - 5, total_z + 2]);
+            translate([x_cut_top_3, 0, -1]) cube([total_x - x_cut_top_3 + 1, y_cut1, total_z + 2]);
+        }
+    }
+}
+
+module seam_volume_top(x_start, x_end) {
+    difference() {
+        translate([x_start, 0, 0]) cube([x_end - x_start, total_y, total_z]);
+        seam_volume_bottom(x_start, x_end);
+    }
+}
+
 // --- Connector Parameters ---
 conn_len = 30;
 conn_width = 10;
@@ -42,13 +68,13 @@ conn_z_pos = 8; // Flush with the top of the 8mm bottom plate
 
 // Connectors along the horizontal middle seam (y_cut1)
 // These connect the top row (parts 6-9) to the bottom row (parts 1-5)
-conn_middle_x_positions = [60,100, 140,175, 210,245, 280, 280+35, 280+70, 280+110-5,275+110+35, 275+110+70,490, 490+35, 490+70,490+70+35, 490+70+70];
+conn_middle_x_positions = [70,100, 140,175, 210,245, 280, 280+35, 280+70, 280+110-5,275+110+35, 275+110+70,490, 490+35, 490+70,490+70+35, 490+70+70];
 
 // Y positions for connectors on bottom row vertical seams (parts 1-5)
 conn_bottom_y_positions = [45, 110];
 
 // Y positions for connectors on top row vertical seams (parts 6-9)
-conn_top_y_positions = [160, 225];
+conn_top_y_positions = [170, 225];
 
 // --- Wall Connector Parameters (Dovetail Rail/Slot) ---
 wall_rail_height = 70;       // Vertical span of the rail (matches wall height)
@@ -175,13 +201,10 @@ module connectors_top() {
 }
 
 module connectors_at_y1() {
-    // Along the horizontal seam (middle connectors)
-    // Uses conn_middle_x_positions array from configuration section
-    // Every other connector is rotated 90 degrees for better interlocking
     for (i = [0 : len(conn_middle_x_positions) - 1]) {
         x_pos = conn_middle_x_positions[i];
         rotation = (i % 2 == 0) ? 90 : 0;  // Alternate: 90, 0, 90, 0, ...
-        translate([x_pos, y_cut1, conn_z_pos]) 
+        translate([x_pos, get_seam_y(x_pos), conn_z_pos]) 
             rotate([0, 0, rotation])
             UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
     }
@@ -282,16 +305,16 @@ module render_part(part_num) {
             // First, cut out the main shape of the selected part
             intersection() {
                 original_model();
-                if (part_num == 1) { translate([0, 0, 0]) cube([x_cut_bottom_1, y_cut1, total_z]); }
-                if (part_num == 2) { translate([x_cut_bottom_1, 0, 0]) cube([x_cut_bottom_2 - x_cut_bottom_1, y_cut1, total_z]); }
-                if (part_num == 3) { translate([x_cut_bottom_2, 0, 0]) cube([x_cut_bottom_3 - x_cut_bottom_2, y_cut1, total_z]); }
-                if (part_num == 4) { translate([x_cut_bottom_3, 0, 0]) cube([x_cut_bottom_4 - x_cut_bottom_3, y_cut1, total_z]); }
-                if (part_num == 5) { translate([x_cut_bottom_4, 0, 0]) cube([total_x - x_cut_bottom_4, y_cut1, total_z]); }
+                if (part_num == 1) { seam_volume_bottom(0, x_cut_bottom_1); }
+                if (part_num == 2) { seam_volume_bottom(x_cut_bottom_1, x_cut_bottom_2); }
+                if (part_num == 3) { seam_volume_bottom(x_cut_bottom_2, x_cut_bottom_3); }
+                if (part_num == 4) { seam_volume_bottom(x_cut_bottom_3, x_cut_bottom_4); }
+                if (part_num == 5) { seam_volume_bottom(x_cut_bottom_4, total_x); }
                 
-                if (part_num == 6) { translate([0, y_cut1, 0]) cube([x_cut_top_1, total_y - y_cut1, total_z]); }
-                if (part_num == 7) { translate([x_cut_top_1, y_cut1, 0]) cube([x_cut_top_2 - x_cut_top_1, total_y - y_cut1, total_z]); }
-                if (part_num == 8) { translate([x_cut_top_2, y_cut1, 0]) cube([x_cut_top_3 - x_cut_top_2, total_y - y_cut1, total_z]); }
-                if (part_num == 9) { translate([x_cut_top_3, y_cut1, 0]) cube([total_x - x_cut_top_3, total_y - y_cut1, total_z]); }
+                if (part_num == 6) { seam_volume_top(0, x_cut_top_1); }
+                if (part_num == 7) { seam_volume_top(x_cut_top_1, x_cut_top_2); }
+                if (part_num == 8) { seam_volume_top(x_cut_top_2, x_cut_top_3); }
+                if (part_num == 9) { seam_volume_top(x_cut_top_3, total_x); }
             }
             
             // Wall connector rails (protrude from right side of each piece)
@@ -304,8 +327,8 @@ module render_part(part_num) {
             if (part_num == 8) { top_wall_rail(x_cut_top_3); }
 
             // Side wall rails at horizontal seam (y_cut1)
-            if (part_num == 1) { add_rail(x=side_wall_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
-            if (part_num == 5) { add_rail(x=total_x - side_wall_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+            if (part_num == 1) { add_rail(x=side_wall_offset, y=get_seam_y(side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+            if (part_num == 5) { add_rail(x=total_x - side_wall_offset, y=get_seam_y(total_x - side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
         }
 
         // Subtract the connector slots for the appropriate faces
@@ -327,8 +350,8 @@ module render_part(part_num) {
         if (part_num == 9) { top_wall_slot(x_cut_top_3); }
 
         // Side wall slots at horizontal seam
-        if (part_num == 6) { add_slot(x=side_wall_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
-        if (part_num == 9) { add_slot(x=total_x - side_wall_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+        if (part_num == 6) { add_slot(x=side_wall_offset, y=get_seam_y(side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+        if (part_num == 9) { add_slot(x=total_x - side_wall_offset, y=get_seam_y(total_x - side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
 
         // Subtract USB connector hole on the back wall (top row parts only)
         if (part_num >= 6 && part_num <= 9) {
