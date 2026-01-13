@@ -9,12 +9,17 @@ use <Connector.scad>
 //=====================================================================
 
 // Set which part to render for export.
+// Part 0:     ALL PARTS - Assembly view showing all parts at once
 // Bottom Row: 1=Left, 2=Mid-Left, 3=Middle, 4=Mid-Right, 5=Right
 // Top Row:    6=Left, 7=Mid-Left, 8=Mid-Right, 9=Right
 // Part 10 is the printable dowel pin.
 // Part 11 is the printable connector.
 // Part 12 is a test wall connector rail (for fit testing).
-part_to_render = 11; // [1:12]
+part_to_render = 0; // [0:12]
+
+// Assembly view spacing (only used when part_to_render = 0)
+// Set to 0 to see parts fully assembled, increase to separate them
+assembly_spacing = 10; // Gap between parts in mm
 
 // --- Split line coordinates ---
 // creating a 5x2 grid of parts (5 on bottom, 4 on top).
@@ -41,6 +46,20 @@ conn_width = 10;
 conn_height = 5;
 conn_z_pos = 8; // Flush with the top of the 8mm bottom plate
 
+// --- Connector Position Arrays ---
+// Edit these arrays to add/remove/move connectors
+// Each value is an X coordinate where a connector will be placed
+
+// Connectors along the horizontal middle seam (y_cut1)
+// These connect the top row (parts 6-9) to the bottom row (parts 1-5)
+conn_middle_x_positions = [60,100, 140,175, 210,245, 280, 280+35, 280+70, 280+110-5,275+110+35, 275+110+70,490, 490+35, 490+70,490+70+35, 490+70+70];
+
+// Y positions for connectors on bottom row vertical seams (parts 1-5)
+conn_bottom_y_positions = [45, 110];
+
+// Y positions for connectors on top row vertical seams (parts 6-9)
+conn_top_y_positions = [160, 225];
+
 // --- Wall Connector Parameters (Dovetail Rail/Slot) ---
 wall_rail_height = 70;       // Vertical span of the rail (matches wall height)
 wall_rail_base = 8;          // Widest part of the dovetail
@@ -52,6 +71,38 @@ side_wall_center_offset = 34; // Center of the side walls (approx 21mm thick)
 side_wall_right_offset = 34;  // Offset for the right side walls (Parts 5 & 9)
 side_wall_rail_base = 6;     // Smaller base for side walls
 side_wall_rail_tip = 3;      // Smaller tip for side walls
+
+// --- USB Connector Hole Parameters ---
+usb_hole_diameter = 24;      // Diameter of the USB connector hole (in mm)
+usb_x_pos = 330;             // X position (centered on the model by default)
+usb_z_pos = 40;              // Z position (height from the bottom, centered on wall)
+
+// D-Type screw hole parameters (Neutrik D-series)
+usb_screw_hole_diameter = 3.4; // Diameter for M3 heat-set inserts
+usb_screw_x_spacing = 19;      // Horizontal distance between screw centers
+usb_screw_z_spacing = 24;      // Vertical distance between screw centers
+
+// Module to create USB connector hole cutout on the back wall
+module usb_connector_hole() {
+    // Back wall is at Y = 276.511, wall thickness is ~21mm
+    // We cut through the entire wall thickness
+    wall_y = 276.511;
+    wall_thickness = 30; // Extra depth to ensure clean cut-through
+    
+    // Main 24mm opening
+    translate([usb_x_pos, wall_y - wall_thickness/2, usb_z_pos])
+    rotate([90, 0, 0])
+    cylinder(h = wall_thickness, d = usb_hole_diameter, center = true, $fn = 64);
+
+    // D-Type mounting holes (diagonal pair 1: top-left and bottom-right)
+    // Horizontal offset: 19/2 = 9.5mm, Vertical offset: 24/2 = 12mm
+    for (offset = [[-usb_screw_x_spacing/2, usb_screw_z_spacing/2], 
+                   [usb_screw_x_spacing/2, -usb_screw_z_spacing/2]]) {
+        translate([usb_x_pos + offset[0], wall_y - wall_thickness/2, usb_z_pos + offset[1]])
+        rotate([90, 0, 0])
+        cylinder(h = wall_thickness, d = usb_screw_hole_diameter, center = true, $fn = 32);
+    }
+}
 
 //=====================================================================
 //== Original Model Definition
@@ -148,8 +199,16 @@ module connectors_bottom() {
     for (cut_x = [x_cut_bottom_1, x_cut_bottom_2, x_cut_bottom_3, x_cut_bottom_4]) {
         // Place connectors in the flat part (Z=4)
         // Avoid button holes.
-        for (y_pos = [45, 110]) {
+        // Original connectors (no rotation)
+        for (y_pos = conn_bottom_y_positions) {
             translate([cut_x, y_pos, conn_z_pos]) 
+                UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
+        }
+        // Flipped connectors between the original ones (rotated 90°)
+        for (i = [0 : len(conn_bottom_y_positions) - 2]) {
+            midpoint_y = (conn_bottom_y_positions[i] + conn_bottom_y_positions[i + 1]) / 2;
+            translate([cut_x, midpoint_y, conn_z_pos]) 
+                rotate([0, 0, 90])
                 UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
         }
     }
@@ -157,18 +216,30 @@ module connectors_bottom() {
 
 module connectors_top() {
     for (cut_x = [x_cut_top_1, x_cut_top_2, x_cut_top_3]) {
-        for (y_pos = [160, 225]) {
+        // Original connectors (no rotation)
+        for (y_pos = conn_top_y_positions) {
             translate([cut_x, y_pos, conn_z_pos]) 
+                UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
+        }
+        // Flipped connectors between the original ones (rotated 90°)
+        for (i = [0 : len(conn_top_y_positions) - 2]) {
+            midpoint_y = (conn_top_y_positions[i] + conn_top_y_positions[i + 1]) / 2;
+            translate([cut_x, midpoint_y, conn_z_pos]) 
+                rotate([0, 0, 90])
                 UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
         }
     }
 }
 
 module connectors_at_y1() {
-    // Along the horizontal seam
-    for (x_pos = [70, 200, 314, 450, 500, 630]) {
+    // Along the horizontal seam (middle connectors)
+    // Uses conn_middle_x_positions array from configuration section
+    // Every other connector is rotated 90 degrees for better interlocking
+    for (i = [0 : len(conn_middle_x_positions) - 1]) {
+        x_pos = conn_middle_x_positions[i];
+        rotation = (i % 2 == 0) ? 90 : 0;  // Alternate: 90, 0, 90, 0, ...
         translate([x_pos, y_cut1, conn_z_pos]) 
-            rotate([0, 0, 90])
+            rotate([0, 0, rotation])
             UniversalConnectorCutout(length=conn_len, width=conn_width, height=conn_height);
     }
 }
@@ -383,92 +454,136 @@ module top_wall_slots() {
 
 total_x = 698.466; total_y = 276.511; total_z = 100;
 
-if (part_to_render >= 1 && part_to_render <= 9) {
+//=====================================================================
+//== Module to render a single part (used by both single and assembly modes)
+//=====================================================================
+module render_part(part_num) {
     difference() {
         union() {
             // First, cut out the main shape of the selected part
             intersection() {
                 original_model();
-                if (part_to_render == 1) { translate([0, 0, 0]) cube([x_cut_bottom_1, y_cut1, total_z]); }
-                if (part_to_render == 2) { translate([x_cut_bottom_1, 0, 0]) cube([x_cut_bottom_2 - x_cut_bottom_1, y_cut1, total_z]); }
-                if (part_to_render == 3) { translate([x_cut_bottom_2, 0, 0]) cube([x_cut_bottom_3 - x_cut_bottom_2, y_cut1, total_z]); }
-                if (part_to_render == 4) { translate([x_cut_bottom_3, 0, 0]) cube([x_cut_bottom_4 - x_cut_bottom_3, y_cut1, total_z]); }
-                if (part_to_render == 5) { translate([x_cut_bottom_4, 0, 0]) cube([total_x - x_cut_bottom_4, y_cut1, total_z]); }
+                if (part_num == 1) { translate([0, 0, 0]) cube([x_cut_bottom_1, y_cut1, total_z]); }
+                if (part_num == 2) { translate([x_cut_bottom_1, 0, 0]) cube([x_cut_bottom_2 - x_cut_bottom_1, y_cut1, total_z]); }
+                if (part_num == 3) { translate([x_cut_bottom_2, 0, 0]) cube([x_cut_bottom_3 - x_cut_bottom_2, y_cut1, total_z]); }
+                if (part_num == 4) { translate([x_cut_bottom_3, 0, 0]) cube([x_cut_bottom_4 - x_cut_bottom_3, y_cut1, total_z]); }
+                if (part_num == 5) { translate([x_cut_bottom_4, 0, 0]) cube([total_x - x_cut_bottom_4, y_cut1, total_z]); }
                 
-                if (part_to_render == 6) { translate([0, y_cut1, 0]) cube([x_cut_top_1, total_y - y_cut1, total_z]); }
-                if (part_to_render == 7) { translate([x_cut_top_1, y_cut1, 0]) cube([x_cut_top_2 - x_cut_top_1, total_y - y_cut1, total_z]); }
-                if (part_to_render == 8) { translate([x_cut_top_2, y_cut1, 0]) cube([x_cut_top_3 - x_cut_top_2, total_y - y_cut1, total_z]); }
-                if (part_to_render == 9) { translate([x_cut_top_3, y_cut1, 0]) cube([total_x - x_cut_top_3, total_y - y_cut1, total_z]); }
+                if (part_num == 6) { translate([0, y_cut1, 0]) cube([x_cut_top_1, total_y - y_cut1, total_z]); }
+                if (part_num == 7) { translate([x_cut_top_1, y_cut1, 0]) cube([x_cut_top_2 - x_cut_top_1, total_y - y_cut1, total_z]); }
+                if (part_num == 8) { translate([x_cut_top_2, y_cut1, 0]) cube([x_cut_top_3 - x_cut_top_2, total_y - y_cut1, total_z]); }
+                if (part_num == 9) { translate([x_cut_top_3, y_cut1, 0]) cube([total_x - x_cut_top_3, total_y - y_cut1, total_z]); }
             }
             
             // Add wall connector rails (protrude from right side of each piece)
             // Bottom row parts - rails at their right cut edge
-            if (part_to_render == 1) { bottom_wall_rail(x_cut_bottom_1, z_start=0, side="right"); }
-            if (part_to_render == 2) { bottom_wall_rail(x_cut_bottom_2, z_start=0, side="right"); }
-            if (part_to_render == 3) { bottom_wall_rail(x_cut_bottom_3, z_start=0, side="right"); }
-            if (part_to_render == 4) { bottom_wall_rail(x_cut_bottom_4, z_start=0, side="right"); }
+            if (part_num == 1) { bottom_wall_rail(x_cut_bottom_1, z_start=0, side="right"); }
+            if (part_num == 2) { bottom_wall_rail(x_cut_bottom_2, z_start=0, side="right"); }
+            if (part_num == 3) { bottom_wall_rail(x_cut_bottom_3, z_start=0, side="right"); }
+            if (part_num == 4) { bottom_wall_rail(x_cut_bottom_4, z_start=0, side="right"); }
             // Part 5 has no rail (rightmost piece)
             
             // Top row parts - rails at their right cut edge
-            if (part_to_render == 6) { top_wall_rail(x_cut_top_1, z_start=0, side="right"); }
-            if (part_to_render == 7) { top_wall_rail(x_cut_top_2, z_start=0, side="right"); }
-            if (part_to_render == 8) { top_wall_rail(x_cut_top_3, z_start=0, side="right"); }
+            if (part_num == 6) { top_wall_rail(x_cut_top_1, z_start=0, side="right"); }
+            if (part_num == 7) { top_wall_rail(x_cut_top_2, z_start=0, side="right"); }
+            if (part_num == 8) { top_wall_rail(x_cut_top_3, z_start=0, side="right"); }
             // Part 9 has no rail (rightmost piece)
 
             // Side wall rails (at horizontal cut y_cut1)
             // Part 1 (Bottom Left) - Rail pointing +Y
-            // EDIT HERE: Initial rail placement for Part 1. Adjust x, y, rotation as needed.
-            if (part_to_render == 1) { 
+            if (part_num == 1) { 
                 add_rail(x=side_wall_center_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); 
             }
             // Part 5 (Bottom Right) - Rail pointing +Y
-            // EDIT HERE: Initial rail placement for Part 5. Adjust x, y, rotation as needed.
-            if (part_to_render == 5) { 
+            if (part_num == 5) { 
                 add_rail(x=total_x - side_wall_right_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); 
             }
         }
 
         // Subtract the dowel holes for the appropriate faces
-        // Holes are added to all parts at the seams
-        if (part_to_render >= 1 && part_to_render <= 5) {
+        if (part_num >= 1 && part_num <= 5) {
             dowels_bottom();
             connectors_bottom();
         }
-        if (part_to_render >= 6 && part_to_render <= 9) {
+        if (part_num >= 6 && part_num <= 9) {
             dowels_top();
             connectors_top();
         }
-        if (part_to_render >= 1 && part_to_render <= 9) {
-            dowels_at_y1();
-            connectors_at_y1();
-        }
+        dowels_at_y1();
+        connectors_at_y1();
         
         // Subtract wall connector slots (cut into left side of each piece)
         // Bottom row parts - slots at their left cut edge
-        // Part 1 has no slot (leftmost piece)
-        if (part_to_render == 2) { bottom_wall_slot(x_cut_bottom_1, z_start=0, side="left"); }
-        if (part_to_render == 3) { bottom_wall_slot(x_cut_bottom_2, z_start=0, side="left"); }
-        if (part_to_render == 4) { bottom_wall_slot(x_cut_bottom_3, z_start=0, side="left"); }
-        if (part_to_render == 5) { bottom_wall_slot(x_cut_bottom_4, z_start=0, side="left"); }
+        if (part_num == 2) { bottom_wall_slot(x_cut_bottom_1, z_start=0, side="left"); }
+        if (part_num == 3) { bottom_wall_slot(x_cut_bottom_2, z_start=0, side="left"); }
+        if (part_num == 4) { bottom_wall_slot(x_cut_bottom_3, z_start=0, side="left"); }
+        if (part_num == 5) { bottom_wall_slot(x_cut_bottom_4, z_start=0, side="left"); }
         
         // Top row parts - slots at their left cut edge
-        // Part 6 has no slot (leftmost piece)
-        if (part_to_render == 7) { top_wall_slot(x_cut_top_1, z_start=0, side="left"); }
-        if (part_to_render == 8) { top_wall_slot(x_cut_top_2, z_start=0, side="left"); }
-        if (part_to_render == 9) { top_wall_slot(x_cut_top_3, z_start=0, side="left"); }
+        if (part_num == 7) { top_wall_slot(x_cut_top_1, z_start=0, side="left"); }
+        if (part_num == 8) { top_wall_slot(x_cut_top_2, z_start=0, side="left"); }
+        if (part_num == 9) { top_wall_slot(x_cut_top_3, z_start=0, side="left"); }
 
         // Side wall slots (at horizontal cut y_cut1)
-        // Part 6 (Top Left) - Slot accepting rail from bottom (+Y)
-        // EDIT HERE: Initial slot placement for Part 6. Adjust x, y, rotation as needed.
-        if (part_to_render == 6) { 
+        // Part 6 (Top Left) - Slot accepting rail from bottom
+        if (part_num == 6) { 
             add_slot(x=side_wall_center_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); 
         }
-        // Part 9 (Top Right) - Slot accepting rail from bottom (+Y)
-        // EDIT HERE: Initial slot placement for Part 9. Adjust x, y, rotation as needed.
-        if (part_to_render == 9) { 
+        // Part 9 (Top Right) - Slot accepting rail from bottom
+        if (part_num == 9) { 
             add_slot(x=total_x - side_wall_right_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); 
         }
+
+        // Subtract USB connector hole on the back wall (top row parts only)
+        if (part_num >= 6 && part_num <= 9) {
+            usb_connector_hole();
+        }
     }
+}
+
+//=====================================================================
+//== Assembly View Mode (Part 0) - Shows all parts at once
+//=====================================================================
+module assembly_view() {
+    echo("Rendering ASSEMBLY VIEW - All 9 parts with spacing");
+    
+    // Calculate offsets for each part based on assembly_spacing
+    // Bottom row: Parts 1-5 (spread along X axis)
+    // Top row: Parts 6-9 (spread along X axis, offset in Y)
+    
+    // Bottom row parts with X spacing
+    translate([0 * assembly_spacing, 0, 0]) 
+        render_part(1);
+    translate([1 * assembly_spacing, 0, 0]) 
+        render_part(2);
+    translate([2 * assembly_spacing, 0, 0]) 
+        render_part(3);
+    translate([3 * assembly_spacing, 0, 0]) 
+        render_part(4);
+    translate([4 * assembly_spacing, 0, 0]) 
+        render_part(5);
+    
+    // Top row parts with X and Y spacing
+    translate([0 * assembly_spacing, assembly_spacing, 0]) 
+        render_part(6);
+    translate([1 * assembly_spacing, assembly_spacing, 0]) 
+        render_part(7);
+    translate([2 * assembly_spacing, assembly_spacing, 0]) 
+        render_part(8);
+    translate([3 * assembly_spacing, assembly_spacing, 0]) 
+        render_part(9);
+}
+
+//=====================================================================
+//== Main Rendering Logic
+//=====================================================================
+
+if (part_to_render == 0) {
+    // Assembly view - show all parts at once
+    assembly_view();
+} else if (part_to_render >= 1 && part_to_render <= 9) {
+    // Single part view
+    render_part(part_to_render);
 } else if (part_to_render == 10) {
     printable_dowel();
 } else if (part_to_render == 11) {
