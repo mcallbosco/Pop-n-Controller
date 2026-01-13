@@ -16,17 +16,33 @@ part_to_render = 0; // [0:11]
 // Set to 0 to see parts fully assembled, increase to separate them
 assembly_spacing = 10; // Gap between parts in mm
 
-// --- Split line coordinates ---
-// creating a 5x2 grid of parts (5 on bottom, 4 on top).
-// Separate cuts for top and bottom rows to avoid holes
-x_cut_bottom_1 = 139.239;
-x_cut_bottom_2 = 279.235;
-x_cut_bottom_3 = 419.231; // New cut to split the large middle part
-x_cut_bottom_4 = 559.228;
+// --- Main Dimensions ---
+// Set top_plate_mode to true for a simple 5mm plate with no button holes
+top_plate_mode = true; 
 
-x_cut_top_1 = 209.237;
-x_cut_top_2 = 349.233;
-x_cut_top_3 = 489.230;
+main_wall_height = 70;
+main_bottom_height = 8;
+
+wall_thickness = 21;
+wall_height = top_plate_mode ? 5 : main_wall_height;
+bottom_height = top_plate_mode ? 5 : main_bottom_height;
+
+total_x = 698.466; 
+total_y = 276.511; 
+total_z = 100;
+
+// --- Split line coordinates ---
+// Shift cuts in top plate mode to ensure seams don't overlap with original hole locations
+cut_shift = top_plate_mode ? 15 : 0;
+
+x_cut_bottom_1 = 139.239 + cut_shift;
+x_cut_bottom_2 = 279.235 + cut_shift;
+x_cut_bottom_3 = 419.231 + cut_shift; 
+x_cut_bottom_4 = 559.228 + cut_shift;
+
+x_cut_top_1 = 209.237 + cut_shift;
+x_cut_top_2 = 349.233 + cut_shift;
+x_cut_top_3 = 489.230 + cut_shift;
 
 y_cut1 = 138.2555; // This is the vertical centerline of the model
 
@@ -60,7 +76,7 @@ module seam_volume_top(x_start, x_end) {
 conn_len = 30;
 conn_width = 10;
 conn_height = 5;
-conn_z_pos = 8; // Flush with the top of the 8mm bottom plate
+conn_z_pos = bottom_height + (top_plate_mode ? 1 : 0); // Flush with top of plate, shifted 1mm up in top_plate_mode
 
 // --- Connector Position Arrays ---
 // Edit these arrays to add/remove/move connectors
@@ -74,16 +90,16 @@ conn_middle_x_positions = [70,100, 140,175, 210,245, 280, 280+35, 280+70, 280+11
 conn_bottom_y_positions = [45, 110];
 
 // Y positions for connectors on top row vertical seams (parts 6-9)
-conn_top_y_positions = [190, 245];
+conn_top_y_positions = [180, 235];
 
 // --- Wall Connector Parameters (Dovetail Rail/Slot) ---
-wall_rail_height = 70;       // Vertical span of the rail (matches wall height)
+wall_rail_height = wall_height; // Matches wall height
 wall_rail_base = 8;          // Widest part of the dovetail
 wall_rail_tip = 4;           // Narrowest part of the dovetail (at the neck)
 wall_rail_depth = 4;         // Length of the dovetail pin
 wall_rail_tolerance = 0.3;   // Clearance for 3D printing fit
 wall_center_offset = 7;      // Distance from outer wall edge to center of connector
-side_wall_offset = 34;       // Center of the side walls (approx 21mm thick)
+side_wall_offset = 32;       // Center of the side walls (approx 21mm thick)
 side_wall_rail_base = 6;     // Smaller base for side walls
 side_wall_rail_tip = 3;      // Smaller tip for side walls
 
@@ -119,15 +135,40 @@ module usb_connector_hole() {
     }
 }
 
+
+// --- Magnet Hole Parameters ---
+// Arrays of X coordinates for two horizontal lines of magnets
+magnet_x_bottom = [80,120,160,200,240,270,320,360,400,440,480,520,560,600,640,680,720,]; 
+magnet_x_top = [130,170,200,240,280,320,360,400,440,480,520,560,600,640,680,720];
+
+// Y positions centered on the front and back walls
+magnet_y_bottom = wall_center_offset;              // Center of bottom wall
+magnet_y_top = total_y - wall_center_offset;      // Center of top wall
+
+// Magnet hole dimensions
+magnet_diameter = 6.2; // Adjust for your magnets
+magnet_depth = 2;       // Pocket depth
+magnet_z_pos = wall_height; // Always at the top of the wall
+
+module magnet_holes() {
+    for (x = magnet_x_bottom) {
+        // Cut downwards from the specified Z position
+        translate([x, magnet_y_bottom, magnet_z_pos - magnet_depth])
+            cylinder(d = magnet_diameter, h = magnet_depth + 0.1, $fn = 32);
+    }
+    for (x = magnet_x_top) {
+        translate([x, magnet_y_top, magnet_z_pos - magnet_depth])
+            cylinder(d = magnet_diameter, h = magnet_depth + 0.1, $fn = 32);
+    }
+}
+
 //=====================================================================
 //== Original Model Definition
 //=====================================================================
 
 module original_model() {
-    // Original variables
-    wallthicknessabstract = 21;
-    wallHeight = 70; //in mm
-    bottomheight = 8; //in mm
+    // Current variables are now global for better integration
+    // wall_thickness, wall_height, bottom_height
 
     module hole_pattern(holex, holey) {
         translate([holex, holey, 0]) cylinder(h = 88, d = 88, center = true);
@@ -137,27 +178,29 @@ module original_model() {
         translate([holex, holey + 43.687, 0]) cylinder(h = 88, d = 7, center = true);
     }
     union() {
-        for (i = [0:.6:wallthicknessabstract]) {
-            translate([349.2335, 138.2555, 0]) linear_extrude(wallHeight)
+        for (i = [0:.6:wall_thickness]) {
+            translate([349.2335, 138.2555, 0]) linear_extrude(wall_height)
             resize([698.466 - i, 276.511 - (i * 1.3), 0], auto = true)
             import (file = "RefrenceForSpacerSCADdontMake.svg", convexity = 3, center = true);
         }
         difference() {
             union() {
                 for (i = [0:.5:60]) {
-                    translate([349.2335, 138.2555, 0]) linear_extrude(bottomheight)
+                    translate([349.2335, 138.2555, 0]) linear_extrude(bottom_height)
                     resize([698.466 - i, 276.511 - (i * 1.3), 0], auto = true)
                     import (file = "RefrenceForSpacerSCADdontMake.svg", convexity = 3, center = true);
                 }
-                translate([100.278, 0, 0]) cube([500, 260, bottomheight]);
-                linear_extrude(bottomheight) polygon([[0, 68], [110, 260], [130, 0]]);
-                linear_extrude(bottomheight) polygon([[694.530, 68], [584.530, 260], [564.530, 0]]);
+                translate([100.278, 0, 0]) cube([500, 260, bottom_height]);
+                linear_extrude(bottom_height) polygon([[0, 68], [110, 260], [130, 0]]);
+                linear_extrude(bottom_height) polygon([[694.530, 68], [584.530, 260], [564.530, 0]]);
             }
-            hole_pattern(69.240, 79.257); hole_pattern(209.237, 79.257);
-            hole_pattern(349.233, 79.257); hole_pattern(489.230, 79.257);
-            hole_pattern(629.226, 79.257); hole_pattern(139.239, 209.254);
-            hole_pattern(279.235, 209.254); hole_pattern(419.231, 209.254);
-            hole_pattern(559.228, 209.254);
+            if (!top_plate_mode) {
+                hole_pattern(69.240, 79.257); hole_pattern(209.237, 79.257);
+                hole_pattern(349.233, 79.257); hole_pattern(489.230, 79.257);
+                hole_pattern(629.226, 79.257); hole_pattern(139.239, 209.254);
+                hole_pattern(279.235, 209.254); hole_pattern(419.231, 209.254);
+                hole_pattern(559.228, 209.254);
+            }
         }
     }
 }
@@ -294,7 +337,7 @@ module add_slot(x, y, z, rotation, base=wall_rail_base, tip=wall_rail_tip) {
 //== Part Selection and Rendering
 //=====================================================================
 
-total_x = 698.466; total_y = 276.511; total_z = 100;
+// Dimensions moved to the top of the file
 
 //=====================================================================
 //== Module to render a single part (used by both single and assembly modes)
@@ -318,17 +361,19 @@ module render_part(part_num) {
             }
             
             // Wall connector rails (protrude from right side of each piece)
-            if (part_num == 1) { bottom_wall_rail(x_cut_bottom_1); }
-            if (part_num == 2) { bottom_wall_rail(x_cut_bottom_2); }
-            if (part_num == 3) { bottom_wall_rail(x_cut_bottom_3); }
-            if (part_num == 4) { bottom_wall_rail(x_cut_bottom_4); }
-            if (part_num == 6) { top_wall_rail(x_cut_top_1); }
-            if (part_num == 7) { top_wall_rail(x_cut_top_2); }
-            if (part_num == 8) { top_wall_rail(x_cut_top_3); }
+            if (!top_plate_mode) {
+                if (part_num == 1) { bottom_wall_rail(x_cut_bottom_1); }
+                if (part_num == 2) { bottom_wall_rail(x_cut_bottom_2); }
+                if (part_num == 3) { bottom_wall_rail(x_cut_bottom_3); }
+                if (part_num == 4) { bottom_wall_rail(x_cut_bottom_4); }
+                if (part_num == 6) { top_wall_rail(x_cut_top_1); }
+                if (part_num == 7) { top_wall_rail(x_cut_top_2); }
+                if (part_num == 8) { top_wall_rail(x_cut_top_3); }
 
-            // Side wall rails at horizontal seam (y_cut1)
-            if (part_num == 1) { add_rail(x=side_wall_offset, y=get_seam_y(side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
-            if (part_num == 5) { add_rail(x=total_x - side_wall_offset, y=get_seam_y(total_x - side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+                // Side wall rails at horizontal seam (y_cut1)
+                if (part_num == 1) { add_rail(x=side_wall_offset, y=get_seam_y(side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+                if (part_num == 5) { add_rail(x=total_x - side_wall_offset, y=get_seam_y(total_x - side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+            }
         }
 
         // Subtract the connector slots for the appropriate faces
@@ -340,21 +385,26 @@ module render_part(part_num) {
         }
         connectors_at_y1();
         
+        // Subtract magnet holes
+        magnet_holes();
+        
         // Wall connector slots (cut into left side of each piece)
-        if (part_num == 2) { bottom_wall_slot(x_cut_bottom_1); }
-        if (part_num == 3) { bottom_wall_slot(x_cut_bottom_2); }
-        if (part_num == 4) { bottom_wall_slot(x_cut_bottom_3); }
-        if (part_num == 5) { bottom_wall_slot(x_cut_bottom_4); }
-        if (part_num == 7) { top_wall_slot(x_cut_top_1); }
-        if (part_num == 8) { top_wall_slot(x_cut_top_2); }
-        if (part_num == 9) { top_wall_slot(x_cut_top_3); }
+        if (!top_plate_mode) {
+            if (part_num == 2) { bottom_wall_slot(x_cut_bottom_1); }
+            if (part_num == 3) { bottom_wall_slot(x_cut_bottom_2); }
+            if (part_num == 4) { bottom_wall_slot(x_cut_bottom_3); }
+            if (part_num == 5) { bottom_wall_slot(x_cut_bottom_4); }
+            if (part_num == 7) { top_wall_slot(x_cut_top_1); }
+            if (part_num == 8) { top_wall_slot(x_cut_top_2); }
+            if (part_num == 9) { top_wall_slot(x_cut_top_3); }
 
-        // Side wall slots at horizontal seam
-        if (part_num == 6) { add_slot(x=side_wall_offset, y=get_seam_y(side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
-        if (part_num == 9) { add_slot(x=total_x - side_wall_offset, y=get_seam_y(total_x - side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+            // Side wall slots at horizontal seam
+            if (part_num == 6) { add_slot(x=side_wall_offset, y=get_seam_y(side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+            if (part_num == 9) { add_slot(x=total_x - side_wall_offset, y=get_seam_y(total_x - side_wall_offset), z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+        }
 
         // Subtract USB connector hole on the back wall (top row parts only)
-        if (part_num >= 6 && part_num <= 9) {
+        if (part_num >= 6 && part_num <= 9 && !top_plate_mode) {
             usb_connector_hole();
         }
     }
