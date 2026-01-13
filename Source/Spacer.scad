@@ -1,7 +1,3 @@
-// Original file includes provided by user
-include <cyl_head_bolt.scad>;
-include <materials.scad>;
-use <threads-library-by-cuiso-v1.scad>
 use <Connector.scad>
 
 //=====================================================================
@@ -12,10 +8,9 @@ use <Connector.scad>
 // Part 0:     ALL PARTS - Assembly view showing all parts at once
 // Bottom Row: 1=Left, 2=Mid-Left, 3=Middle, 4=Mid-Right, 5=Right
 // Top Row:    6=Left, 7=Mid-Left, 8=Mid-Right, 9=Right
-// Part 10 is the printable dowel pin.
-// Part 11 is the printable connector.
-// Part 12 is a test wall connector rail (for fit testing).
-part_to_render = 0; // [0:12]
+// Part 10 is the printable connector.
+// Part 11 is a test wall connector rail (for fit testing).
+part_to_render = 0; // [0:11]
 
 // Assembly view spacing (only used when part_to_render = 0)
 // Set to 0 to see parts fully assembled, increase to separate them
@@ -34,11 +29,6 @@ x_cut_top_2 = 349.233;
 x_cut_top_3 = 489.230;
 
 y_cut1 = 138.2555; // This is the vertical centerline of the model
-
-// --- Assembly Dowel Parameters ---
-dowel_d = 5;          // Diameter of the dowel pins (in mm)
-dowel_hole_depth = 10;  // Depth of the hole on each side
-printer_tolerance = 0.2; // Clearance for the dowel. Adjust for a looser/tighter fit.
 
 // --- Connector Parameters ---
 conn_len = 30;
@@ -67,8 +57,7 @@ wall_rail_tip = 4;           // Narrowest part of the dovetail (at the neck)
 wall_rail_depth = 4;         // Length of the dovetail pin
 wall_rail_tolerance = 0.3;   // Clearance for 3D printing fit
 wall_center_offset = 7;      // Distance from outer wall edge to center of connector
-side_wall_center_offset = 34; // Center of the side walls (approx 21mm thick)
-side_wall_right_offset = 34;  // Offset for the right side walls (Parts 5 & 9)
+side_wall_offset = 34;       // Center of the side walls (approx 21mm thick)
 side_wall_rail_base = 6;     // Smaller base for side walls
 side_wall_rail_tip = 3;      // Smaller tip for side walls
 
@@ -147,52 +136,6 @@ module original_model() {
     }
 }
 
-//=====================================================================
-//== Dowel and Splitting Logic
-//=====================================================================
-
-dowel_hole_d = dowel_d + printer_tolerance;
-
-// -- Dowel modules for vertical seams (X-cuts)
-// Dowels are now placed *around* the large holes.
-module dowels_bottom() {
-    for (cut_x = [x_cut_bottom_1, x_cut_bottom_2, x_cut_bottom_3, x_cut_bottom_4]) {
-        for (z_pos = [20, 50]) { // Two heights for stability
-            // Y positions are chosen to be outside the 88mm diameter holes
-            for (y_pos = [30, 130]) {
-                translate([cut_x, y_pos, z_pos]) rotate([0, 90, 0]) 
-                    cylinder(d = dowel_hole_d, h = dowel_hole_depth * 2, center = true, $fn = 16);
-            }
-        }
-    }
-}
-
-module dowels_top() {
-    for (cut_x = [x_cut_top_1, x_cut_top_2, x_cut_top_3]) {
-        for (z_pos = [20, 50]) { // Two heights for stability
-            // Y positions are chosen to be outside the 88mm diameter holes
-            for (y_pos = [150, 250]) {
-                translate([cut_x, y_pos, z_pos]) rotate([0, 90, 0]) 
-                    cylinder(d = dowel_hole_d, h = dowel_hole_depth * 2, center = true, $fn = 16);
-            }
-        }
-    }
-}
-
-// -- Dowel module for the horizontal seam (Y-cut)
-module dowels_at_y1() {
-    // Adjusted 280 to 314 to avoid cut line at 279.235
-    for (x_pos = [50, 200, 314, 450, 500, 650]) {
-        translate([x_pos, y_cut1, wallHeight / 2]) rotate([90, 0, 0]) 
-            cylinder(d = dowel_hole_d, h = dowel_hole_depth * 2, center = true, $fn = 16);
-    }
-}
-
-// -- Module to generate a single dowel pin for printing
-module printable_dowel() {
-    echo("Rendering one dowel pin.");
-    rotate([90,0,0]) cylinder(h = dowel_hole_depth * 2 - printer_tolerance, d = dowel_d, center = true, $fn=32);
-}
 
 // -- Connector Modules
 module connectors_bottom() {
@@ -295,157 +238,33 @@ module wall_connector_slot(x_pos, y_pos, z_start, height=wall_rail_height, rotat
         wall_rail_profile_2d(slot_base, slot_tip, slot_depth);
 }
 
-// Convenience module: Rail on bottom wall (Y=0 area)
-// side: "left" or "right" - which side of the piece the connector is on
-// For left side: rotation=180 (rail points inward/right, slot opens outward/left)
-// For right side: rotation=0 (rail points outward/right, slot opens inward/left)
-// Wait, direction depends on which face we are on.
-// Bottom wall is at Y=0.
-// If we are at the RIGHT cut of a piece (e.g. x_cut_bottom_1), we want the rail to stick out in +X direction?
-// No, the cut is in the Y-Z plane. The rail should stick out in the X direction?
-// The user said "rail on the side of the wall spanning vertically across it".
-// If the wall runs along X, the cut face is in the Y-Z plane.
-// So the rail should protrude from the Y-Z plane in the +X or -X direction.
-// My previous implementation rotated by 90 degrees to point in Y.
-// Let's re-evaluate orientation.
-// The cut is at `x = x_cut_bottom_1`. This is a plane x=constant.
-// The wall runs along X.
-// So the cross section of the wall is in the Y-Z plane.
-// We want to join two pieces along the X axis.
-// So the rail should point in the X direction.
-// If I am on the RIGHT side of a piece (max X), the rail should point +X.
-// If I am on the LEFT side of a piece (min X), the slot should be cut into the material (pointing -X?).
-
-// Let's adjust the rotation logic.
-// Default `wall_connector_rail` rotates 90 deg to point in Y.
-// If we want it to point in +X, we need rotation = -90.
-// If we want it to point in -X, we need rotation = 90.
-
-module bottom_wall_rail(x_pos, z_start=0, height=wall_rail_height, side="right") {
-    // Rail on the right side of the piece (pointing +X)
-    // Position: x_pos is the cut line.
-    // y_pos: centered in the wall. Bottom wall is at Y=0 to Y~14. Center ~7.
-    y_center = wall_center_offset;
-    
-    // If side is "right", we want the rail to start at x_pos and go +X.
-    // Rotation: -90 makes it point +X.
-    rotation = (side == "right") ? -90 : 90;
-    
-    wall_connector_rail(x_pos, y_center, z_start, height, rotation);
+// Bottom wall rail (Y=0 area) - rotation -90 points +X for right side
+module bottom_wall_rail(x_pos, z_start=0) {
+    wall_connector_rail(x_pos, wall_center_offset, z_start, wall_rail_height, -90);
 }
 
-module bottom_wall_slot(x_pos, z_start=0, height=wall_rail_height, side="left") {
-    // Slot on the left side of the piece (cutting into the material from -X direction?)
-    // If side is "left", the piece starts at x_pos. The slot should be cut into the piece.
-    // So the slot shape should be positioned at x_pos and point +X (into the piece).
-    // Wait, if the rail from the previous piece (left) points +X, 
-    // then the slot on this piece (right) should accept that rail.
-    // So the slot volume should be exactly where the rail would be.
-    // If the rail is on the LEFT piece, it ends at x_pos.
-    // So the rail points +X and its base is at x_pos (on the left piece).
-    // Actually, usually:
-    // Left Piece: Ends at x_cut. Has Rail protruding +X.
-    // Right Piece: Starts at x_cut. Has Slot cut into it (accepting the rail).
-    
-    // So for the Right Piece (side="left" of the piece), we need a slot at x_cut.
-    // The slot should match the rail from the left piece.
-    // Rail from left piece: Origin at x_cut, pointing +X.
-    // So Slot should also be at x_cut, pointing +X.
-    
-    y_center = wall_center_offset;
-    rotation = -90; // Points +X
-    
-    wall_connector_slot(x_pos, y_center, z_start, height, rotation);
+// Bottom wall slot - accepts rail from adjacent piece
+module bottom_wall_slot(x_pos, z_start=0) {
+    wall_connector_slot(x_pos, wall_center_offset, z_start, wall_rail_height, -90);
 }
 
-// Convenience module: Rail on top wall (Y=total_y area)
-module top_wall_rail(x_pos, z_start=0, height=wall_rail_height, side="right") {
-    // Top wall is at Y=276.511. Wall goes inwards (smaller Y).
-    // Center is at total_y - wall_center_offset.
-    y_center = 276.511 - wall_center_offset;
-    
-    // Rail on right side of piece: Points +X.
-    rotation = -90;
-    
-    wall_connector_rail(x_pos, y_center, z_start, height, rotation);
+// Top wall rail (Y=276.511 area)
+module top_wall_rail(x_pos, z_start=0) {
+    wall_connector_rail(x_pos, 276.511 - wall_center_offset, z_start, wall_rail_height, -90);
 }
 
-// Generic modules for easy positioning
-module add_rail(x, y, z, rotation, length=wall_rail_height, base=wall_rail_base, tip=wall_rail_tip) {
-    wall_connector_rail(x, y, z, length, rotation, base, tip);
+// Top wall slot
+module top_wall_slot(x_pos, z_start=0) {
+    wall_connector_slot(x_pos, 276.511 - wall_center_offset, z_start, wall_rail_height, -90);
 }
 
-module add_slot(x, y, z, rotation, length=wall_rail_height, base=wall_rail_base, tip=wall_rail_tip) {
-    wall_connector_slot(x, y, z, length, rotation, base, tip);
+// Generic rail/slot placement helpers
+module add_rail(x, y, z, rotation, base=wall_rail_base, tip=wall_rail_tip) {
+    wall_connector_rail(x, y, z, wall_rail_height, rotation, base, tip);
 }
 
-// Module for rails on the side walls (at the horizontal Y-cut)
-module side_wall_rail(x_pos, y_pos, z_start=0, height=wall_rail_height, side="bottom") {
-    // side="bottom" means it's on the bottom piece, pointing +Y
-    // side="top" means it's on the top piece, pointing -Y
-    
-    rotation = (side == "bottom") ? 0 : 180;
-    
-    wall_connector_rail(x_pos, y_pos, z_start, height, rotation, base=side_wall_rail_base, tip=side_wall_rail_tip);
-}
-
-module side_wall_slot(x_pos, y_pos, z_start=0, height=wall_rail_height, side="top") {
-    // side="top" means it's on the top piece, accepting a rail from bottom (+Y)
-    // So slot points +Y.
-    
-    rotation = (side == "top") ? 0 : 180;
-    
-    wall_connector_slot(x_pos, y_pos, z_start, height, rotation, base=side_wall_rail_base, tip=side_wall_rail_tip);
-}
-
-module top_wall_slot(x_pos, z_start=0, height=wall_rail_height, side="left") {
-    // Slot on left side of piece: Accepts rail from left piece.
-    // Rail points +X. Slot points +X.
-    y_center = 276.511 - wall_center_offset;
-    rotation = -90;
-    
-    wall_connector_slot(x_pos, y_center, z_start, height, rotation);
-}
-
-// Module to add rails to bottom wall pieces at cut lines
-// Each piece gets a rail on one side and expects a slot on the other
-module bottom_wall_rails() {
-    // Rails protrude from the RIGHT side of each piece (except the rightmost)
-    // Part 1: rail on right side at x_cut_bottom_1
-    bottom_wall_rail(x_cut_bottom_1, z_start=0, side="right");
-    // Part 2: rail on right side at x_cut_bottom_2
-    bottom_wall_rail(x_cut_bottom_2, z_start=0, side="right");
-    // Part 3: rail on right side at x_cut_bottom_3
-    bottom_wall_rail(x_cut_bottom_3, z_start=0, side="right");
-    // Part 4: rail on right side at x_cut_bottom_4
-    bottom_wall_rail(x_cut_bottom_4, z_start=0, side="right");
-}
-
-module bottom_wall_slots() {
-    // Slots cut into the LEFT side of each piece (except the leftmost)
-    // Part 2: slot on left side at x_cut_bottom_1
-    bottom_wall_slot(x_cut_bottom_1, z_start=0, side="left");
-    // Part 3: slot on left side at x_cut_bottom_2
-    bottom_wall_slot(x_cut_bottom_2, z_start=0, side="left");
-    // Part 4: slot on left side at x_cut_bottom_3
-    bottom_wall_slot(x_cut_bottom_3, z_start=0, side="left");
-    // Part 5: slot on left side at x_cut_bottom_4
-    bottom_wall_slot(x_cut_bottom_4, z_start=0, side="left");
-}
-
-// Module to add rails to top wall pieces at cut lines
-module top_wall_rails() {
-    // Rails protrude from the RIGHT side of each piece
-    top_wall_rail(x_cut_top_1, z_start=0, side="right");
-    top_wall_rail(x_cut_top_2, z_start=0, side="right");
-    top_wall_rail(x_cut_top_3, z_start=0, side="right");
-}
-
-module top_wall_slots() {
-    // Slots cut into the LEFT side of each piece
-    top_wall_slot(x_cut_top_1, z_start=0, side="left");
-    top_wall_slot(x_cut_top_2, z_start=0, side="left");
-    top_wall_slot(x_cut_top_3, z_start=0, side="left");
+module add_slot(x, y, z, rotation, base=wall_rail_base, tip=wall_rail_tip) {
+    wall_connector_slot(x, y, z, wall_rail_height, rotation, base, tip);
 }
 
 //=====================================================================
@@ -475,64 +294,41 @@ module render_part(part_num) {
                 if (part_num == 9) { translate([x_cut_top_3, y_cut1, 0]) cube([total_x - x_cut_top_3, total_y - y_cut1, total_z]); }
             }
             
-            // Add wall connector rails (protrude from right side of each piece)
-            // Bottom row parts - rails at their right cut edge
-            if (part_num == 1) { bottom_wall_rail(x_cut_bottom_1, z_start=0, side="right"); }
-            if (part_num == 2) { bottom_wall_rail(x_cut_bottom_2, z_start=0, side="right"); }
-            if (part_num == 3) { bottom_wall_rail(x_cut_bottom_3, z_start=0, side="right"); }
-            if (part_num == 4) { bottom_wall_rail(x_cut_bottom_4, z_start=0, side="right"); }
-            // Part 5 has no rail (rightmost piece)
-            
-            // Top row parts - rails at their right cut edge
-            if (part_num == 6) { top_wall_rail(x_cut_top_1, z_start=0, side="right"); }
-            if (part_num == 7) { top_wall_rail(x_cut_top_2, z_start=0, side="right"); }
-            if (part_num == 8) { top_wall_rail(x_cut_top_3, z_start=0, side="right"); }
-            // Part 9 has no rail (rightmost piece)
+            // Wall connector rails (protrude from right side of each piece)
+            if (part_num == 1) { bottom_wall_rail(x_cut_bottom_1); }
+            if (part_num == 2) { bottom_wall_rail(x_cut_bottom_2); }
+            if (part_num == 3) { bottom_wall_rail(x_cut_bottom_3); }
+            if (part_num == 4) { bottom_wall_rail(x_cut_bottom_4); }
+            if (part_num == 6) { top_wall_rail(x_cut_top_1); }
+            if (part_num == 7) { top_wall_rail(x_cut_top_2); }
+            if (part_num == 8) { top_wall_rail(x_cut_top_3); }
 
-            // Side wall rails (at horizontal cut y_cut1)
-            // Part 1 (Bottom Left) - Rail pointing +Y
-            if (part_num == 1) { 
-                add_rail(x=side_wall_center_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); 
-            }
-            // Part 5 (Bottom Right) - Rail pointing +Y
-            if (part_num == 5) { 
-                add_rail(x=total_x - side_wall_right_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); 
-            }
+            // Side wall rails at horizontal seam (y_cut1)
+            if (part_num == 1) { add_rail(x=side_wall_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+            if (part_num == 5) { add_rail(x=total_x - side_wall_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
         }
 
-        // Subtract the dowel holes for the appropriate faces
+        // Subtract the connector slots for the appropriate faces
         if (part_num >= 1 && part_num <= 5) {
-            dowels_bottom();
             connectors_bottom();
         }
         if (part_num >= 6 && part_num <= 9) {
-            dowels_top();
             connectors_top();
         }
-        dowels_at_y1();
         connectors_at_y1();
         
-        // Subtract wall connector slots (cut into left side of each piece)
-        // Bottom row parts - slots at their left cut edge
-        if (part_num == 2) { bottom_wall_slot(x_cut_bottom_1, z_start=0, side="left"); }
-        if (part_num == 3) { bottom_wall_slot(x_cut_bottom_2, z_start=0, side="left"); }
-        if (part_num == 4) { bottom_wall_slot(x_cut_bottom_3, z_start=0, side="left"); }
-        if (part_num == 5) { bottom_wall_slot(x_cut_bottom_4, z_start=0, side="left"); }
-        
-        // Top row parts - slots at their left cut edge
-        if (part_num == 7) { top_wall_slot(x_cut_top_1, z_start=0, side="left"); }
-        if (part_num == 8) { top_wall_slot(x_cut_top_2, z_start=0, side="left"); }
-        if (part_num == 9) { top_wall_slot(x_cut_top_3, z_start=0, side="left"); }
+        // Wall connector slots (cut into left side of each piece)
+        if (part_num == 2) { bottom_wall_slot(x_cut_bottom_1); }
+        if (part_num == 3) { bottom_wall_slot(x_cut_bottom_2); }
+        if (part_num == 4) { bottom_wall_slot(x_cut_bottom_3); }
+        if (part_num == 5) { bottom_wall_slot(x_cut_bottom_4); }
+        if (part_num == 7) { top_wall_slot(x_cut_top_1); }
+        if (part_num == 8) { top_wall_slot(x_cut_top_2); }
+        if (part_num == 9) { top_wall_slot(x_cut_top_3); }
 
-        // Side wall slots (at horizontal cut y_cut1)
-        // Part 6 (Top Left) - Slot accepting rail from bottom
-        if (part_num == 6) { 
-            add_slot(x=side_wall_center_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); 
-        }
-        // Part 9 (Top Right) - Slot accepting rail from bottom
-        if (part_num == 9) { 
-            add_slot(x=total_x - side_wall_right_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); 
-        }
+        // Side wall slots at horizontal seam
+        if (part_num == 6) { add_slot(x=side_wall_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
+        if (part_num == 9) { add_slot(x=total_x - side_wall_offset, y=y_cut1, z=0, rotation=0, base=side_wall_rail_base, tip=side_wall_rail_tip); }
 
         // Subtract USB connector hole on the back wall (top row parts only)
         if (part_num >= 6 && part_num <= 9) {
@@ -541,37 +337,12 @@ module render_part(part_num) {
     }
 }
 
-//=====================================================================
-//== Assembly View Mode (Part 0) - Shows all parts at once
-//=====================================================================
+// Assembly View - Shows all parts at once with spacing
 module assembly_view() {
-    echo("Rendering ASSEMBLY VIEW - All 9 parts with spacing");
-    
-    // Calculate offsets for each part based on assembly_spacing
-    // Bottom row: Parts 1-5 (spread along X axis)
-    // Top row: Parts 6-9 (spread along X axis, offset in Y)
-    
-    // Bottom row parts with X spacing
-    translate([0 * assembly_spacing, 0, 0]) 
-        render_part(1);
-    translate([1 * assembly_spacing, 0, 0]) 
-        render_part(2);
-    translate([2 * assembly_spacing, 0, 0]) 
-        render_part(3);
-    translate([3 * assembly_spacing, 0, 0]) 
-        render_part(4);
-    translate([4 * assembly_spacing, 0, 0]) 
-        render_part(5);
-    
-    // Top row parts with X and Y spacing
-    translate([0 * assembly_spacing, assembly_spacing, 0]) 
-        render_part(6);
-    translate([1 * assembly_spacing, assembly_spacing, 0]) 
-        render_part(7);
-    translate([2 * assembly_spacing, assembly_spacing, 0]) 
-        render_part(8);
-    translate([3 * assembly_spacing, assembly_spacing, 0]) 
-        render_part(9);
+    // Bottom row: Parts 1-5
+    for (i = [0:4]) translate([i * assembly_spacing, 0, 0]) render_part(i + 1);
+    // Top row: Parts 6-9
+    for (i = [0:3]) translate([i * assembly_spacing, assembly_spacing, 0]) render_part(i + 6);
 }
 
 //=====================================================================
@@ -585,11 +356,9 @@ if (part_to_render == 0) {
     // Single part view
     render_part(part_to_render);
 } else if (part_to_render == 10) {
-    printable_dowel();
-} else if (part_to_render == 11) {
     echo("Rendering one connector.");
     UniversalConnector(length=conn_len, width=conn_width, height=conn_height);
-} else if (part_to_render == 12) {
+} else if (part_to_render == 11) {
     echo("Rendering test wall connector rail.");
     // Test piece: a small section of wall with a rail for fit testing
     // Print this to test the fit before printing full parts
@@ -604,6 +373,6 @@ if (part_to_render == 0) {
     translate([25, 0, 5])
     wall_connector_rail(0, wall_center_offset, 0, height=wall_rail_height, rotation=-90);
 } else {
-    echo("Invalid part_to_render selected! Please choose a value from 1 to 12.");
+    echo("Invalid part_to_render selected! Please choose a value from 0 to 11.");
     %original_model(); // Show the full model with cut lines for reference
 }
