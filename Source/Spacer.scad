@@ -32,19 +32,19 @@ y_cut1 = 138.2555; // This is the vertical centerline of the model
 
 // --- Variable Seam Height logic ---
 function get_seam_y(x) = 
-    (x < x_cut_top_1) ? (y_cut1 + 10) :
-    (x < x_cut_top_2) ? y_cut1 :
-    (x < x_cut_top_3) ? (y_cut1 - 5) :
-    y_cut1;
+    (x < x_cut_top_1) ? (y_cut1 - 4) :
+    (x < x_cut_top_2) ? (y_cut1 + 13) :
+    (x < x_cut_top_3) ? (y_cut1 + 13) :
+    (y_cut1 - 4);
 
 module seam_volume_bottom(x_start, x_end) {
     intersection() {
         translate([x_start, 0, 0]) cube([x_end - x_start, total_y, total_z]);
         union() {
-            translate([-1, 0, -1]) cube([x_cut_top_1 + 1, y_cut1 + 10, total_z + 2]);
-            translate([x_cut_top_1, 0, -1]) cube([x_cut_top_2 - x_cut_top_1, y_cut1, total_z + 2]);
-            translate([x_cut_top_2, 0, -1]) cube([x_cut_top_3 - x_cut_top_2, y_cut1 - 5, total_z + 2]);
-            translate([x_cut_top_3, 0, -1]) cube([total_x - x_cut_top_3 + 1, y_cut1, total_z + 2]);
+            translate([-1, 0, -1]) cube([x_cut_top_1 + 1, y_cut1 - 4, total_z + 2]);
+            translate([x_cut_top_1, 0, -1]) cube([x_cut_top_2 - x_cut_top_1, y_cut1 + 13, total_z + 2]);
+            translate([x_cut_top_2, 0, -1]) cube([x_cut_top_3 - x_cut_top_2, y_cut1 + 13, total_z + 2]);
+            translate([x_cut_top_3, 0, -1]) cube([total_x - x_cut_top_3 + 1, y_cut1 - 4, total_z + 2]);
         }
     }
 }
@@ -74,7 +74,7 @@ conn_middle_x_positions = [70,100, 140,175, 210,245, 280, 280+35, 280+70, 280+11
 conn_bottom_y_positions = [45, 110];
 
 // Y positions for connectors on top row vertical seams (parts 6-9)
-conn_top_y_positions = [170, 225];
+conn_top_y_positions = [190, 245];
 
 // --- Wall Connector Parameters (Dovetail Rail/Slot) ---
 wall_rail_height = 70;       // Vertical span of the rail (matches wall height)
